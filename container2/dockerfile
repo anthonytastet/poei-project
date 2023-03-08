@@ -6,12 +6,12 @@ RUN /bin/bash -c 'apt update && apt upgrade'
 # install utilities
 RUN /bin/bash -c 'apt install -y wget unzip procps'
 
-# install Java 17 required by Sonarqube
+# install Java 11 required by Sonarqube
 RUN /bin/bash -c 'apt update && \
-    apt install -y openjdk-17-jdk'
+    apt install -y openjdk-11-jdk'
 
 # setup Java environment variables 
-RUN /bin/bash -c 'echo "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> /etc/bash.bashrc && \
+RUN /bin/bash -c 'echo "export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64" >> /etc/bash.bashrc && \
     source /etc/environment'
 
 # install PostgreSQL 13
@@ -34,7 +34,6 @@ RUN /bin/bash -c 'echo "alias psql=/usr/lib/postgresql/13/bin/psql" >> /etc/bash
     source /etc/bash.bashrc'
 
 USER postgres
-# RUN /bin/bash -c '/usr/lib/postgresql/13/bin/initdb -D /usr/local/pgsql/data'
 RUN /bin/bash -c '/usr/lib/postgresql/13/bin/initdb -D /usr/local/pgsql/data'
 RUN /bin/bash -c '/usr/lib/postgresql/13/bin/pg_ctl -D /usr/local/pgsql/data -l /home/postgres/logfile start && \
     /usr/lib/postgresql/13/bin/createuser -w sonar && \
