@@ -1,0 +1,69 @@
+FROM debian:11
+
+# upgrade system
+RUN /bin/bash -c 'apt update && apt upgrade'
+
+# install utilities
+RUN /bin/bash -c 'apt install -y wget unzip procps'
+
+# install Java 17 required by Sonarqube
+RUN /bin/bash -c 'apt update && \
+    apt install -y openjdk-17-jdk'
+
+# setup Java environment variables 
+RUN /bin/bash -c 'echo "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> /etc/bash.bashrc && \
+    source /etc/environment'
+
+# install PostgreSQL 13
+RUN /bin/bash -c 'apt install -y postgresql postgresql-contrib'
+
+
+
+
+
+# setup PostgreSQL
+RUN /bin/bash -c 'userdel -r postgres && \
+    adduser --disabled-password --gecos "" --shell "/bin/bash" postgres && \
+    mkdir -p /usr/local/pgsql && \
+    chown -R postgres /usr/local/pgsql && \
+    chown -R postgres /var/run/postgresql'
+
+RUN /bin/bash -c 'echo "alias psql=/usr/lib/postgresql/13/bin/psql" >> /etc/bash.bashrc && \
+    echo "alias initdb=/usr/lib/postgresql/13/bin/initdb" >> /etc/bash.bashrc && \
+    echo "alias pg_ctl=/usr/lib/postgresql/13/bin/pg_ctl" >> /etc/bash.bashrc && \
+    source /etc/bash.bashrc'
+
+USER postgres
+# RUN /bin/bash -c '/usr/lib/postgresql/13/bin/initdb -D /usr/local/pgsql/data'
+RUN /bin/bash -c '/usr/lib/postgresql/13/bin/initdb -D /usr/local/pgsql/data'
+RUN /bin/bash -c '/usr/lib/postgresql/13/bin/pg_ctl -D /usr/local/pgsql/data -l /home/postgres/logfile start && \
+    /usr/lib/postgresql/13/bin/createuser -w sonar && \
+    psql -c "CREATE DATABASE sonarqube OWNER sonar;" && \
+    psql -c "grant all privileges on DATABASE sonarqube to sonar;"'
+
+# install Sonarqube
+USER root
+RUN /bin/bash -c 'cd /tmp/ && \
+    wget https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-8.9.0.43852.zip && \
+    unzip sonarqube*.zip -d /opt && \
+    rm sonarqube-8.9.0.43852.zip && \
+    mv /opt/sonarqube* /opt/sonarqube'
+
+# unzip sonarqube-8.9.0.43852.zip && \
+
+
+# setup Sonarqube
+RUN /bin/bash -c 'echo "sonarqube   -   nofile   65536" >> /etc/security/limits.conf && \
+    echo "sonarqube   -   nofile   65536" >> /etc/security/limits.conf && \
+    groupadd sonar && \
+    useradd -c "user to run SonarQube" -d /opt/sonarqube -g sonar sonar && \
+    chown sonar:sonar /opt/sonarqube -R && \
+    echo "sonar.jdbc.username=sonar" >> /opt/sonarqube/conf/sonar.properties && \
+    echo "sonar.jdbc.password=sonar" >> /opt/sonarqube/conf/sonar.properties && \
+    echo "RUN_AS_USER=sonar" >> /opt/sonarqube/bin/linux-x86-64/sonar.sh'
+
+COPY docker-entrypoint.sh /usr/local/bin/
+
+EXPOSE 9000
+
+ENTRYPOINT ["docker-entrypoint.sh"]
