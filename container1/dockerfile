@@ -1,0 +1,80 @@
+FROM debian:11
+
+# install utilities
+RUN /bin/bash -c 'apt update && \
+    apt install -y \
+    vim \
+    curl \
+    wget\
+    sudo'
+
+# upgrade packages
+RUN /bin/bash -c 'apt upgrade -y'
+
+# install Java 17 required by Jenkins
+RUN /bin/bash -c 'apt update && \
+    apt install -y openjdk-17-jdk'
+
+# install Java 8 required by Nexus
+RUN /bin/bash -c 'cd /tmp && \
+    wget https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u362-b09/OpenJDK8U-jre_x64_linux_hotspot_8u362b09.tar.gz && \
+    tar xf /tmp/OpenJDK8*.tar.gz -C /opt && \
+    cd - && \
+    mv /opt/jdk8u* /opt/java-8-openjdk-amd64'
+
+# setup Java environment variables 
+RUN /bin/bash -c 'echo "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> /etc/bash.bashrc && \
+    source /etc/environment'
+
+# add Jenkins source to local apt source list 
+RUN /bin/bash -c 'curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io.key | tee \
+    /usr/share/keyrings/jenkins-keyring.asc > /dev/null &&\
+    echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+    https://pkg.jenkins.io/debian-stable binary/ | tee \
+    /etc/apt/sources.list.d/jenkins.list > /dev/null'
+
+# install Jenkins
+RUN /bin/bash -c 'apt update && \
+    apt install -y jenkins'
+
+# install Maven
+RUN /bin/bash -c 'cd /tmp && \
+    wget https://dlcdn.apache.org/maven/maven-3/3.9.0/binaries/apache-maven-3.9.0-bin.tar.gz && \
+    tar xf /tmp/apache-maven-*.tar.gz -C /opt && \
+    cd - && \
+    mv /opt/apache-maven* /opt/maven'
+
+# setup Maven environment variables 
+RUN /bin/bash -c 'echo "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> /etc/profile.d/maven.sh && \
+    echo "export M2_HOME=/opt/maven" >> /etc/profile.d/maven.sh && \
+    echo "export MAVEN_HOME=/opt/maven" >> /etc/profile.d/maven.sh && \
+    echo "export PATH=\${M2_HOME}/bin:\${PATH}" >> /etc/profile.d/maven.sh && \
+    chmod +x /etc/profile.d/maven.sh && \
+    source /etc/profile.d/maven.sh && \
+    cat /etc/profile.d/maven.sh >> /etc/bash.bashrc'
+
+# install Nexus
+RUN /bin/bash -c 'cd /tmp && \
+    wget https://download.sonatype.com/nexus/3/latest-unix.tar.gz && \
+    tar xf /tmp/latest*.tar.gz -C /opt && \
+    cd - && \
+    mv /opt/nexus* /opt/nexus && \
+    echo "alias nexus=/opt/nexus/bin/nexus" >> /etc/bash.bashrc && \
+    source /etc/bash.bashrc && \
+    echo "INSTALL4J_JAVA_HOME_OVERRIDE=/opt/java-8-openjdk-amd64" >> /opt/nexus/bin/nexus'
+
+# setup Nexus environment 
+RUN /bin/bash -c 'adduser --disabled-password --gecos "" nexus && \
+    chown -R nexus:nexus /opt/nexus && \
+    chown -R nexus:nexus /opt/sonatype-work && \
+    echo "nexus ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers && \
+    echo "run_as_user=nexus" > /opt/nexus/bin/nexus.rc && \
+    echo -e "[Unit] \nDescription=nexus service \nAfter=network.target \n\n[Service] \nType=forking \nLimitNOFILE=65536 \nExecStart=/opt/nexus/bin/nexus start \nExecStop=/opt/nexus/bin/nexus stop \nUser=nexus \nRestart=on-abort \n\n[Install] \nWantedBy=multi-user.target" >> /etc/systemd/system/nexus.service'
+
+COPY docker-entrypoint.sh /usr/local/bin/
+
+# designate launch commands
+ENTRYPOINT ["docker-entrypoint.sh"]
+
+# designate used ports
+EXPOSE 8080 8081
