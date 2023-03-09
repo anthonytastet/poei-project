@@ -17,22 +17,16 @@ RUN /bin/bash -c 'echo "export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64" >> 
 # install PostgreSQL 13
 RUN /bin/bash -c 'apt install -y postgresql postgresql-contrib'
 
-
-
-
-
 # setup PostgreSQL
 RUN /bin/bash -c 'userdel -r postgres && \
     adduser --disabled-password --gecos "" --shell "/bin/bash" postgres && \
     mkdir -p /usr/local/pgsql && \
     chown -R postgres /usr/local/pgsql && \
     chown -R postgres /var/run/postgresql'
-
 RUN /bin/bash -c 'echo "alias psql=/usr/lib/postgresql/13/bin/psql" >> /etc/bash.bashrc && \
     echo "alias initdb=/usr/lib/postgresql/13/bin/initdb" >> /etc/bash.bashrc && \
     echo "alias pg_ctl=/usr/lib/postgresql/13/bin/pg_ctl" >> /etc/bash.bashrc && \
     source /etc/bash.bashrc'
-
 USER postgres
 RUN /bin/bash -c '/usr/lib/postgresql/13/bin/initdb -D /usr/local/pgsql/data'
 RUN /bin/bash -c '/usr/lib/postgresql/13/bin/pg_ctl -D /usr/local/pgsql/data -l /home/postgres/logfile start && \
@@ -47,9 +41,6 @@ RUN /bin/bash -c 'cd /tmp/ && \
     unzip sonarqube*.zip -d /opt && \
     rm sonarqube-8.9.0.43852.zip && \
     mv /opt/sonarqube* /opt/sonarqube'
-
-# unzip sonarqube-8.9.0.43852.zip && \
-
 
 # setup Sonarqube
 RUN /bin/bash -c 'echo "sonarqube   -   nofile   65536" >> /etc/security/limits.conf && \

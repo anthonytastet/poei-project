@@ -2,7 +2,8 @@
 
 su nexus -c "/opt/nexus/bin/nexus start";
 jenkins;
-# ceci est un test
+sleep infinity;
+
 # echo $JENKINS_HOME
 # echo $JENKINS_PORT
 # cat /var/lib/jenkins/secrets/intialAdminPassword
