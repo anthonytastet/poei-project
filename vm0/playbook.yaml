@@ -1,0 +1,130 @@
+---
+- name: Installer Kubernetes et Docker sur une machine CentOS
+  hosts: vm01
+  become: true
+  tasks:
+    - name: Mise à jour de la liste des paquets
+      yum:
+        update_cache: yes
+
+    - name: Ajout du Repo Docker
+      ansible.builtin.command: 'yum config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo'
+
+    - name: Installation de Containerd
+      ansible.builtin.command: 'yum install https://download.docker.com/linux/centos/7/x86_64/stable/Packages/containerd.io-1.2.10-3.2.el7.x86_64.rpm -y'
+
+    - name: Installation de Docker
+      ansible.builtin.command: 'yum install docker-ce --nobest -y'
+
+    - name: Ajout du repository Kubernetes
+      yum_repository:
+        name: kubernetes
+        description: Kubernetes
+        baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+        gpgcheck: yes
+        gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+        enabled: yes
+
+    - name: Installation de Kubernetes Kubelet
+      ansible.builtin.command: 'yum install -y kubelet'
+
+    - name: Installation de Kubernetes Kubeadm
+      ansible.builtin.command: 'yum install -y kubeadm'
+
+    - name: Installation de Kubernetes Kubectl
+      ansible.builtin.command: 'yum install -y kubectl'
+
+    - name: Activer le service kubelet
+      service:
+        name: kubelet
+        enabled: yes
+        state: started
+
+    - name: Démarrer Docker
+      service:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Installer JDK 17
+      ansible.builtin.command: 'yum install -y -v java-17-openjdk'
+
+    - name: Installer Java 8
+      ansible.builtin.command: 'yum install -y -v java-1.8.0-openjdk'
+
+    - name: Changer les vars de Java
+      ansible.builtin.command: "echo 'export JAVA_HOME=/usr/lib/jvm/jre-17-openjdk' >> /etc/bash.bashrc && source /etc/environment"
+
+    - name: Installer Jenkins
+      ansible.builtin.command: 'wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo'
+
+    - name: Installer Jenkins-2
+      ansible.builtin.command: 'rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io.key'
+
+    - name: Installer Jenkins-3
+      ansible.builtin.command: 'yum install -y jenkins'
+
+    - name: Installer Maven
+      ansible.builtin.command: 'yum install -y maven'
+
+    - name: Changer les vars de Maven
+      ansible.builtin.command: "echo 'export JAVA_HOME=/usr/lib/jvm/jre-17-openjdk' >> /etc/profile.d/maven.sh && echo 'export M2_HOME=/usr/share/maven/' >> /etc/profile.d/maven.sh && echo 'export MAVEN_HOME=/usr/share/maven/' >> /etc/profile.d/maven.sh"
+
+    - name: Changer les vars de Maven-2
+      ansible.builtin.command: "echo 'export PATH=${M2_HOME}/bin:${PATH}' >> /etc/profile.d/maven.sh && chmod +x /etc/profile.d/maven.sh && source /etc/profile.d/maven.sh && cat /etc/profile.d/maven.sh >> /etc/bash.bashrc"
+
+    - name: Installer Nexus
+      ansible.builtin.command: 'wget https://download.sonatype.com/nexus/3/latest-unix.tar.gz'
+
+    - name: Installer Nexus-2
+      ansible.builtin.command: 'tar xf latest-unix.tar.gz -C /opt'
+
+    - name: Installer Nexus-3
+      ansible.builtin.command: 'cd /opt/'
+
+    - name: Installer Nexus-5
+      ansible.builtin.command: 'mv -f /opt/nexus-3.49.0-02 /opt/nexus'
+
+    - name: Installer Nexus-6
+      ansible.builtin.command: "echo 'alias nexus=/opt/nexus/bin/nexus' >> /etc/bash.bashrc && source /etc/bash.bashrc"
+
+    - name: Installer PostgreSQL
+      ansible.builtin.command: 'yum install -y postgresql'
+
+    - name: Installer PostgreSQL-2
+      ansible.builtin.command: 'yum install -y postgresql-contrib'
+
+    - name: Installer PostgreSQL-3
+      ansible.builtin.command: 'yum install -y postgresql-server'
+
+    - name: Reglage PostgreSQL
+      ansible.builtin.command: "adduser -p '' postgres"
+
+    - name: Reglage PostgreSQL-1
+      ansible.builtin.command: "mkdir -p /usr/local/pgsql"
+
+    - name: Reglage PostgreSQL-2
+      ansible.builtin.command: "chown -R postgres /usr/local/pgsql"
+
+    - name: Reglage PostgreSQL-3
+      ansible.builtin.command: "chown -R postgres /var/run/postgresql"
+
+    - name: Reglage PostgreSQL-4
+      become_user: postgres
+      ansible.builtin.command: "initdb -D /usr/local/pgsql/data"
+
+    - name: Reglage PostgreSQL-5
+      become_user: postgres
+      ansible.builtin.command: "pg_ctl -D /usr/local/pgsql/data -l /home/postgres/logfile start"
+      
+    - name: Reglage PostgreSQL-6
+      become_user: postgres
+      ansible.builtin.command: "createuser -w sonar"
+
+    - name: Reglage PostgreSQL-7
+      become_user: postgres
+      ansible.builtin.command: "psql -c 'CREATE DATABASE sonarqube OWNER sonar;'"
+      
+    - name: Reglage PostgreSQL-8
+      become_user: postgres
+      ansible.builtin.command: "psql -c 'grant all privileges on DATABASE sonarqube to sonar;'"

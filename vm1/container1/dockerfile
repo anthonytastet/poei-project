@@ -6,6 +6,7 @@ RUN /bin/bash -c 'apt update && \
     vim \
     curl \
     wget\
+    git \
     sudo'
 
 # upgrade packages
