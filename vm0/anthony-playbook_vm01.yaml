@@ -226,6 +226,13 @@
         line: "NEXUS_HOME=/opt/nexus" 
         backrefs: true
 
+    - name: Post installation setup - set Nexus listen port
+      ansible.builtin.lineinfile: 
+        dest: /opt/sonatype-work/nexus3/etc/nexus.properties 
+        regexp: "^application-port=" 
+        line: "application-port=18081" 
+        backrefs: true
+
     - name: Post installation setup - create Nexus piddir
       ansible.builtin.file: 
         path: /var/run/nexus 
