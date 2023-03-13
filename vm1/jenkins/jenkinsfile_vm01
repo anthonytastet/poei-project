@@ -1,0 +1,69 @@
+pipeline {
+    agent {
+        label "jenkins_controller"
+    }
+    tools {
+        maven "localMaven"
+        git "localGit"
+    }
+    environment {
+        NEXUS_VERSION = "nexus3"
+        NEXUS_PROTOCOL = "http" 
+        NEXUS_URL = "127.0.0.1:8081" // IP address and port number where Nexus is running
+        NEXUS_REPOSITORY = "bookstore-releases/" // dedicated Maven repository created on Nexus GUI
+        NEXUS_CREDENTIAL_ID = "nexus-credentials" // Nexus user ID created in Jenkins
+    }
+    stages {
+        stage("Clone code from VCS") {
+            steps {
+                script {
+                    git 'https://github.com/anthonytastet/bookstore.git';
+                }
+            }
+        }
+        stage("Maven Build") {
+            steps {
+                script {
+                    sh "mvn package -DskipTests=true"
+                }
+            }
+        }
+        stage("Publish to Nexus Repository Manager") {
+            steps {
+                script {
+                    pom = readMavenPom file: "pom.xml";
+                    filesByGlob = findFiles(glob: "target/*.${pom.packaging}");
+                    echo "${filesByGlob[0].name} ${filesByGlob[0].path} ${filesByGlob[0].directory} ${filesByGlob[0].length} ${filesByGlob[0].lastModified}"
+                    //artifactPath = filesByGlob[0].path;
+                    artifactPath = "/root/.jenkins/workspace/jenkins_pipeline_test/target/bookstore-1.war"
+                    artifactExists = fileExists file: artifactPath;
+                    echo "artifact exists: ${artifactExists}";
+                    if(artifactExists) {
+                        echo "file: ${artifactPath} \ngroup: ${pom.groupId} \npackaging: ${pom.packaging} \nversion ${pom.version}";
+                        nexusArtifactUploader(
+                            nexusVersion: NEXUS_VERSION,
+                            protocol: NEXUS_PROTOCOL,
+                            nexusUrl: NEXUS_URL,
+                            groupId: pom.groupId,
+                            version: pom.version,
+                            repository: NEXUS_REPOSITORY,
+                            credentialsId: NEXUS_CREDENTIAL_ID,
+                            artifacts: [
+                                [artifactId: pom.artifactId,
+                                classifier: '',
+                                file: artifactPath,
+                                type: pom.packaging],
+                                //[artifactId: pom.artifactId,
+                                //classifier: '',
+                                //file: "pom.xml",
+                                //type: "pom"]
+                            ]
+                        );
+                    } else {
+                        error "*** File: ${artifactPath}, could not be found";
+                    }
+                }
+            }
+        }
+    }
+}

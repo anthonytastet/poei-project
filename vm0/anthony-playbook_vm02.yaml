@@ -1,0 +1,88 @@
+---
+- name: Provisionner la VM02
+  hosts: vm02
+  become: true
+  tasks:
+
+    # Add Repositories
+    - name: Add Docker repository
+      get_url:
+        url: https://download.docker.com/linux/centos/docker-ce.repo
+        dest: /etc/yum.repos.d/docker-ce.repo
+
+    - name: Add Kubernetes Repository
+      yum_repository:
+        name: kubernetes
+        description: Kubernetes
+        baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+        gpgcheck: yes
+        gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+        enabled: yes
+
+    # Update packages list
+    - name: Update package list
+      ansible.builtin.yum:
+        update_cache: yes
+
+    # Pre installation setup
+    - name: Remove the kubelet package
+      ansible.builtin.dnf:
+        name: kubelet
+        state: absent
+
+    # Install packages
+    - name: Install necessary packages
+      ansible.builtin.yum:
+        name: "{{ utils_packages }}"
+        state: latest
+      vars:
+        utils_packages:
+        - yum-utils
+        - device-mapper-persistent-data
+
+    - name: Install Docker packages
+      package:
+        name: "{{ docker_packages }}"
+        state: latest
+      vars:
+        docker_packages:
+        - lvm2
+        - docker-ce
+
+    - name: Install Kubernetes packages
+      ansible.builtin.yum:
+        name: "{{ kubernetes_packages }}"
+        state: latest
+      vars:
+        kubernetes_packages:
+        - kubelet
+        - kubeadm
+        - kubectl
+
+    - name: Install Java 17 packages
+      package:
+        name: java-17-openjdk
+        state: latest
+
+    # Post installation setup
+    - name: Post installation setup - set default java
+      ansible.builtin.command: alternatives --set java /usr/lib/jvm/java-17-openjdk-17.0.1.0.12-2.el8_5.x86_64/bin/java
+
+    - name: Post installation setup - set JAVA_HOME
+      ansible.builtin.lineinfile: 
+        dest: /etc/bash.bashrc 
+        insertafter: EOF
+        line: "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-17.0.1.0.12-2.el8_5.x86_64"
+
+    # Start services
+    - name: Start Docker service
+      ansible.builtin.service:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Start Kubelet service
+      ansible.builtin.service:
+        name: kubelet
+        enabled: yes
+        state: started

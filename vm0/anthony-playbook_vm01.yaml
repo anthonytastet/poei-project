@@ -66,7 +66,7 @@
         recurse: true
 
     # Install packages
-    - name: Install necessary packages
+    - name: Install utility packages
       ansible.builtin.yum:
         name: "{{ utils_packages }}"
         state: latest
@@ -144,6 +144,27 @@
         - postgresql
         - postgresql-contrib
         - postgresql-server
+
+    # - name: Install Sonarqube [ 1/3]
+    #   ansible.builtin.unarchive:
+    #     src: https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-9.9.0.65466.zip
+    #     dest: /opt
+    #     remote_src: yes
+    #   args:
+    #     creates: /opt/sonarqube
+
+    # - name: Install Sonarqube [ 2/3]
+    #   ansible.builtin.shell: mv -f /opt/sonarqube-* /opt/sonarqube
+    #   args:
+    #     creates: /opt/nexus
+
+    # - name: Install Sonarqube [ 3/3]
+    #   ansible.builtin.file:
+    #     path: /opt/sonarqube
+    #     state: directory
+    #     owner: sonar
+    #     group: sonar
+    #     recurse: yes
 
     # Post installation setup
     - name: Post installation setup - set default java
