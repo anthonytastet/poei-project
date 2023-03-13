@@ -29,6 +29,24 @@ RUN /bin/bash -c 'cd /tmp && \
     tar xf tomcat.tar.gz && \
     cp -Rv /tmp/apache-tomcat-10.1.7/* /opt/tomcat/'
 
+# install Apache Tomcat MySQL connector
+RUN /bin/bash -c 'cd /tmp && \
+    wget http://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-java-5.1.39.tar.gz -O /tmp/mysql-connector-java.tar.gz && \
+    tar xf mysql-connector-java.tar.gz && \
+    cp mysql-connector-java-5.1.39/mysql-connector-java-5.1.39-bin.jar /opt/tomcat/lib/'
+
+# cp du server.xml
+COPY server.xml /opt/tomcat/conf/server.xml
+RUN /bin/bash -c 'chmod 600 /opt/tomcat/conf/server.xml'
+
+# cp du server.xml
+COPY tomcat-users.xml /opt/tomcat/conf/tomcat-users.xml
+RUN /bin/bash -c 'chmod 600 /opt/tomcat/conf/tomcat-users.xml'
+
+# cp du Bookstore.war
+COPY target/Bookstore.war /opt/tomcat/webapps/bookstore.war
+RUN /bin/bash -c 'chmod -x /opt/tomcat/webapps/bookstore.war'
+
 EXPOSE 8080
 
 CMD ["/opt/tomcat/bin/catalina.sh", "run"]
