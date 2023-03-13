@@ -1,41 +1,40 @@
 pipeline {
     agent {
-        label "jenkins_controller"
+        label "jenkins_controller" // Jenkins agent tasked with executing these pipeline steps
     }
     tools {
-        maven "localMaven"
-        git "localGit"
+        maven "localMaven" // ID of the maven tool in Jenkins 
+        git "localGit" // ID of the git tool in Jenkins
     }
     environment {
-        NEXUS_VERSION = "nexus3"
-        NEXUS_PROTOCOL = "http" 
-        NEXUS_URL = "127.0.0.1:8081" // IP address and port number where Nexus is running
+        NEXUS_VERSION = "nexus3" // version of the nexus binary
+        NEXUS_PROTOCOL = "http" // protocol used by nexus
+        NEXUS_URL = "10.0.2.45:18081" // IP address and port number where Nexus is running
         NEXUS_REPOSITORY = "bookstore-releases/" // dedicated Maven repository created on Nexus GUI
         NEXUS_CREDENTIAL_ID = "nexus-credentials" // Nexus user ID created in Jenkins
     }
     stages {
-        stage("Clone code from VCS") {
+        stage("Pull source code from GitHub") {
             steps {
                 script {
-                    git 'https://github.com/anthonytastet/bookstore.git';
+                    git 'https://github.com/anthonytastet/bookstore.git'; // Address of the GitHub repository hosting the application's source code
                 }
             }
         }
         stage("Maven Build") {
             steps {
                 script {
-                    sh "mvn package -DskipTests=true"
+                    sh "mvn clean package -DskipTests=true" // Create maven build
                 }
             }
         }
-        stage("Publish to Nexus Repository Manager") {
+        stage("Publish to Nexus Repository Manager") { // Transfer build artifact to Nexus Repository Manager 
             steps {
                 script {
                     pom = readMavenPom file: "pom.xml";
                     filesByGlob = findFiles(glob: "target/*.${pom.packaging}");
                     echo "${filesByGlob[0].name} ${filesByGlob[0].path} ${filesByGlob[0].directory} ${filesByGlob[0].length} ${filesByGlob[0].lastModified}"
-                    //artifactPath = filesByGlob[0].path;
-                    artifactPath = "/root/.jenkins/workspace/jenkins_pipeline_test/target/bookstore-1.war"
+                    artifactPath = "/var/lib/jenkins/workspace/jenkins_pipeline/target/bookstore-1.war"
                     artifactExists = fileExists file: artifactPath;
                     echo "artifact exists: ${artifactExists}";
                     if(artifactExists) {
@@ -53,22 +52,11 @@ pipeline {
                                 classifier: '',
                                 file: artifactPath,
                                 type: pom.packaging],
-                                //[artifactId: pom.artifactId,
-                                //classifier: '',
-                                //file: "pom.xml",
-                                //type: "pom"]
                             ]
                         );
                     } else {
                         error "*** File: ${artifactPath}, could not be found";
                     }
-                }
-            }
-        }
-        stage("Push artifact to vm02") {
-            steps {
-                script {
-                    sh "mvn package -DskipTests=true"
                 }
             }
         }

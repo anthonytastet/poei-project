@@ -2,10 +2,6 @@ pipeline {
     agent {
         label "jenkins_controller"
     }
-    // tools {
-    //     // maven "localMaven"
-    //     // git "localGit"
-    // }
     environment {
         NEXUS_VERSION = "nexus3"
         NEXUS_PROTOCOL = "http" 
@@ -14,22 +10,21 @@ pipeline {
         NEXUS_CREDENTIAL_ID = "nexus-credentials" // Nexus user ID created in Jenkins
     }
     stages {
+        /*
         stage("Pull artifact from Nexus Repository") {
             steps {
                 script {
-                    sh script: 'su trainee curl -u admin:admin -o /tmp/bookstore-1.war "http://10.0.2.45:18081/repository/bookstore-releases/com/mycompany/myapp/bookstore/1/bookstore-1.war"'
+                    sh script: 'curl -u admin:admin -o /tmp/bookstore-1.war "http://10.0.2.45:18081/repository/bookstore-releases/com/mycompany/myapp/bookstore/1/bookstore-1.war"'
                 }
             }
         }
+        */
         stage("Push artifact to vm02") {
             steps {
                 script {
-                    sh script: 'scp /tmp/bookstore-1.war root@10.0.2.46:/home/trainee/bookstore-1.war'
+                    sh script : 'ssh trainee@10.0.2.46 \'curl -u admin:admin -o /tmp/bookstore-1.war "http://10.0.2.45:18081/repository/bookstore-releases/com/mycompany/myapp/bookstore/1/bookstore-1.war"\''
                 }
             }
         }
     }
 }
-
-
-
