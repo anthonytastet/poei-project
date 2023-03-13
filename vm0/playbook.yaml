@@ -143,11 +143,11 @@
       creates: /opt/nexus
   - name: Install Nexus [ 3/3]
     ansible.builtin.file:
-    path: /opt/nexus
-    state: directory
-    owner: nexus
-    group: nexus
-    recurse: yes
+      path: /opt/nexus
+      state: directory
+      owner: nexus
+      group: nexus
+      recurse: yes
 
 
 - name: Install PostgreSQL packages - VM01
@@ -173,9 +173,9 @@
     ansible.builtin.command: alternatives --set java /usr/lib/jvm/java-17-openjdk-17.0.1.0.12-2.el8_5.x86_64/bin/java
   - name: Post installation setup - set JAVA_HOME
     ansible.builtin.lineinfile: 
-    dest: /etc/bash.bashrc 
-    insertafter: EOF
-    line: "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-17.0.1.0.12-2.el8_5.x86_64"
+      dest: /etc/bash.bashrc 
+      insertafter: EOF
+      line: "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-17.0.1.0.12-2.el8_5.x86_64"
 
 - name: Post installation setup - VM01
   hosts: vm01
@@ -203,9 +203,9 @@
       line: "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-17.0.1.0.12-2.el8_5.x86_64" 
   - name: Post installation setup - set PATH for Maven
     ansible.builtin.lineinfile: 
-        dest: /etc/profile.d/maven.sh
-        insertafter: EOF
-        line: "export PATH=${M2_HOME}/bin:${PATH}" 
+      dest: /etc/profile.d/maven.sh
+      insertafter: EOF
+      line: "export PATH=${M2_HOME}/bin:${PATH}" 
   - name: Post installation setup - make maven.sh executable
     ansible.builtin.file:
       path: /etc/profile.d/maven.sh
