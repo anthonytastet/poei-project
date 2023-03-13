@@ -1,22 +1,15 @@
----
-- name: Installer Kubernetes et Docker sur une machine CentOS
+- name: Provisionner la VM01
   hosts: vm01
   become: true
   tasks:
-    - name: Mise à jour de la liste des paquets
-      yum:
-        update_cache: yes
 
-    - name: Ajout du Repo Docker
-      ansible.builtin.command: 'yum config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo'
+    # Add Repositories
+    - name: Add Docker repository
+      get_url:
+        url: https://download.docker.com/linux/centos/docker-ce.repo
+        dest: /etc/yum.repos.d/docker-ce.repo
 
-    - name: Installation de Containerd
-      ansible.builtin.command: 'yum install https://download.docker.com/linux/centos/7/x86_64/stable/Packages/containerd.io-1.2.10-3.2.el7.x86_64.rpm -y'
-
-    - name: Installation de Docker
-      ansible.builtin.command: 'yum install docker-ce --nobest -y'
-
-    - name: Ajout du repository Kubernetes
+    - name: Add Kubernetes Repository
       yum_repository:
         name: kubernetes
         description: Kubernetes
@@ -24,107 +17,271 @@
         gpgcheck: yes
         gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
         enabled: yes
+    
+    - name: Add Jenkins repository
+      get_url:
+        url: https://pkg.jenkins.io/redhat-stable/jenkins.repo
+        dest: /etc/yum.repos.d/jenkins.repo
 
-    - name: Installation de Kubernetes Kubelet
-      ansible.builtin.command: 'yum install -y kubelet'
+    # Update packages list
+    - name: Update package list
+      ansible.builtin.yum:
+        update_cache: yes
 
-    - name: Installation de Kubernetes Kubeadm
-      ansible.builtin.command: 'yum install -y kubeadm'
-
-    - name: Installation de Kubernetes Kubectl
-      ansible.builtin.command: 'yum install -y kubectl'
-
-    - name: Activer le service kubelet
-      service:
+    # Pre installation setup
+    - name: Remove the kubelet package
+      ansible.builtin.dnf:
         name: kubelet
-        enabled: yes
-        state: started
+        state: absent
 
-    - name: Démarrer Docker
-      service:
+    - name: Pre installation Nexus setup - create nexus group
+      ansible.builtin.group:
+        name: nexus
+        state: present
+
+    - name: Pre installation Nexus setup - create nexus user
+      ansible.builtin.user:
+        name: nexus
+        group: nexus
+        state: present
+
+    - name: Pre installation Postgres setup - create group postgre
+      ansible.builtin.group:
+        name: postgres
+        state: present
+    
+    - name: Pre installation Postgres setup - create user postgre
+      ansible.builtin.user:
+        name: postgres
+        group: postgres
+        state: present
+
+    - name: Pre installation Postgres setup - create /usr/local/pgsql directory
+      ansible.builtin.file: 
+        path: /usr/local/pgsql
+        state: directory
+        owner: postgres
+        group: postgres
+        recurse: true
+
+    # Install packages
+    - name: Install necessary packages
+      ansible.builtin.yum:
+        name: "{{ utils_packages }}"
+        state: latest
+      vars:
+        utils_packages:
+        - yum-utils
+        - device-mapper-persistent-data
+
+    - name: Install Docker packages
+      package:
+        name: "{{ docker_packages }}"
+        state: latest
+      vars:
+        docker_packages:
+        - lvm2
+        - docker-ce
+
+    - name: Install Kubernetes packages
+      ansible.builtin.yum:
+        name: "{{ kubernetes_packages }}"
+        state: latest
+      vars:
+        kubernetes_packages:
+        - kubelet
+        - kubeadm
+        - kubectl
+
+    - name: Install Java 17 packages
+      package:
+        name: java-17-openjdk
+        state: latest
+
+    - name: Install Java 8 packages
+      package:
+        name: java-1.8.0-openjdk
+        state: latest
+
+    - name: Install Jenkins packages
+      yum :
+        name: jenkins
+        state: latest
+
+    - name: Install Maven packages
+      ansible.builtin.yum :
+        name: maven
+        state: latest
+
+    - name: Install Nexus [ 1/3]
+      ansible.builtin.unarchive:
+        src: https://download.sonatype.com/nexus/3/latest-unix.tar.gz
+        dest: /opt
+        remote_src: yes
+      args:
+        creates: /opt/nexus
+
+    - name: Install Nexus [ 2/3]
+      ansible.builtin.shell: mv -f /opt/nexus-* /opt/nexus
+      args:
+        creates: /opt/nexus
+
+    - name: Install Nexus [ 3/3]
+      ansible.builtin.file:
+        path: /opt/nexus
+        state: directory
+        owner: nexus
+        group: nexus
+        recurse: yes
+
+    - name: Install PostgreSQL packages
+      ansible.builtin.yum :
+        name: "{{ postgresql_packages }}"
+        state: latest
+      vars: 
+        postgresql_packages:
+        - postgresql
+        - postgresql-contrib
+        - postgresql-server
+
+    # Post installation setup
+    - name: Post installation setup - set default java
+      ansible.builtin.command: alternatives --set java /usr/lib/jvm/java-17-openjdk-17.0.1.0.12-2.el8_5.x86_64/bin/java
+
+    - name: Post installation setup - set JAVA_HOME
+      ansible.builtin.lineinfile: 
+        dest: /etc/bash.bashrc 
+        insertafter: EOF
+        line: "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-17.0.1.0.12-2.el8_5.x86_64"
+
+    - name: Post installation setup - create /etc/profile.d/maven.sh
+      ansible.builtin.file:
+        path: /etc/profile.d/maven.sh
+        state: touch
+        mode: +x
+
+    - name: Post installation setup - set MAVEN_HOME
+      ansible.builtin.lineinfile: 
+        dest: /etc/profile.d/maven.sh
+        insertafter: EOF
+        line: "export MAVEN_HOME=/usr/share/maven/"
+
+    - name: Post installation setup - set M2_HOME
+      ansible.builtin.lineinfile: 
+        dest: /etc/profile.d/maven.sh
+        insertafter: EOF
+        line: "export M2_HOME=/usr/share/maven/"
+
+    - name: Post installation setup - set JAVA_HOME for Maven
+      ansible.builtin.lineinfile: 
+        dest: /etc/profile.d/maven.sh
+        insertafter: EOF
+        line: "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-17.0.1.0.12-2.el8_5.x86_64" 
+
+    - name: Post installation setup - set PATH for Maven
+      ansible.builtin.lineinfile: 
+        dest: /etc/profile.d/maven.sh
+        insertafter: EOF
+        line: "export PATH=${M2_HOME}/bin:${PATH}" 
+
+    - name: Post installation setup - make maven.sh executable
+      ansible.builtin.file:
+        path: /etc/profile.d/maven.sh
+        state: touch
+        mode: +x
+
+    - name: Post installation setup - make Nexus runned by nexus user
+      ansible.builtin.lineinfile: 
+        dest: /opt/nexus/bin/nexus 
+        regexp: "#RUN_AS_USER=" 
+        line: "RUN_AS_USER=nexus" 
+        backrefs: true
+
+    - name: Post installation setup - set NEXUS_HOME
+      ansible.builtin.lineinfile: 
+        dest: /opt/nexus/bin/nexus 
+        regexp: "^NEXUS_HOME" 
+        line: "NEXUS_HOME=/opt/nexus" 
+        backrefs: true
+
+    - name: Post installation setup - create Nexus piddir
+      ansible.builtin.file: 
+        path: /var/run/nexus 
+        state: directory 
+        group: nexus 
+        owner: nexus
+
+    - name: Post installation setup - set Nexus pidir
+      ansible.builtin.lineinfile: 
+        dest: /opt/nexus/bin/nexus 
+        regexp: "^#PIDDIR=" 
+        line: "PIDDIR=/var/run/nexus" 
+        backrefs: true
+
+    - name: Post installation setup - create symbolic links to /etc/init.d/nexus
+      ansible.builtin.file: 
+        src: /opt/nexus/bin/nexus 
+        dest: /etc/init.d/nexus 
+        state: link
+
+    - name: Post installation setup - initialise PostgreSQL database
+      become_user: postgres
+      ansible.builtin.command: 'initdb -D /usr/local/pgsql/data'
+      args: 
+        creates: /usr/local/pgsql/data
+
+    - name: Post installation setup - start PostgreSQL database
+      become_user: postgres
+      ansible.builtin.command: 'pg_ctl -D /usr/local/pgsql/data -l /home/postgres/logfile start'
+      args: 
+        creates: /home/postgres/logfile
+
+    - name: Post installation setup - create user sonar
+      become_user: postgres
+      ansible.builtin.command: 'createuser -w sonar'
+      args: 
+        creates: /usr/local/pgsql/data
+
+    - name: Post installation setup- create database sonarqube
+      become_user: postgres
+      ansible.builtin.command: "psql -c 'CREATE DATABASE sonarqube OWNER sonar;'"
+      args: 
+        creates: /usr/local/pgsql/data
+
+    - name: Post installation setup - set ownership of database sonarqube
+      become_user: postgres
+      ansible.builtin.command: "psql -c 'grant all privileges on DATABASE sonarqube to sonar;'"
+      args: 
+        creates: /usr/local/pgsql/data
+
+    - name: Post installation setup - source /etc/bash.bashrc
+      ansible.builtin.shell: "source /etc/bash.bashrc"
+
+    - name: Post installation setup - /etc/profile.d/maven.sh
+      ansible.builtin.shell: "source /etc/profile.d/maven.sh"
+
+    # Start services
+    - name: Start Docker service
+      ansible.builtin.service:
         name: docker
         enabled: yes
         state: started
 
-    - name: Installer JDK 17
-      ansible.builtin.command: 'yum install -y -v java-17-openjdk'
+    - name: Start Kubelet service
+      ansible.builtin.service:
+        name: kubelet
+        enabled: yes
+        state: started
 
-    - name: Installer Java 8
-      ansible.builtin.command: 'yum install -y -v java-1.8.0-openjdk'
+    - name: Start Jenkins service
+      ansible.builtin.service:
+        name: jenkins
+        enabled: yes
+        state: started
 
-    - name: Changer les vars de Java
-      ansible.builtin.command: "echo 'export JAVA_HOME=/usr/lib/jvm/jre-17-openjdk' >> /etc/bash.bashrc && source /etc/environment"
-
-    - name: Installer Jenkins
-      ansible.builtin.command: 'wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo'
-
-    - name: Installer Jenkins-2
-      ansible.builtin.command: 'rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io.key'
-
-    - name: Installer Jenkins-3
-      ansible.builtin.command: 'yum install -y jenkins'
-
-    - name: Installer Maven
-      ansible.builtin.command: 'yum install -y maven'
-
-    - name: Changer les vars de Maven
-      ansible.builtin.command: "echo 'export JAVA_HOME=/usr/lib/jvm/jre-17-openjdk' >> /etc/profile.d/maven.sh && echo 'export M2_HOME=/usr/share/maven/' >> /etc/profile.d/maven.sh && echo 'export MAVEN_HOME=/usr/share/maven/' >> /etc/profile.d/maven.sh"
-
-    - name: Changer les vars de Maven-2
-      ansible.builtin.command: "echo 'export PATH=${M2_HOME}/bin:${PATH}' >> /etc/profile.d/maven.sh && chmod +x /etc/profile.d/maven.sh && source /etc/profile.d/maven.sh && cat /etc/profile.d/maven.sh >> /etc/bash.bashrc"
-
-    - name: Installer Nexus
-      ansible.builtin.command: 'wget https://download.sonatype.com/nexus/3/latest-unix.tar.gz'
-
-    - name: Installer Nexus-2
-      ansible.builtin.command: 'tar xf latest-unix.tar.gz -C /opt'
-
-    - name: Installer Nexus-3
-      ansible.builtin.command: 'cd /opt/'
-
-    - name: Installer Nexus-5
-      ansible.builtin.command: 'mv -f /opt/nexus-3.49.0-02 /opt/nexus'
-
-    - name: Installer Nexus-6
-      ansible.builtin.command: "echo 'alias nexus=/opt/nexus/bin/nexus' >> /etc/bash.bashrc && source /etc/bash.bashrc"
-
-    - name: Installer PostgreSQL
-      ansible.builtin.command: 'yum install -y postgresql'
-
-    - name: Installer PostgreSQL-2
-      ansible.builtin.command: 'yum install -y postgresql-contrib'
-
-    - name: Installer PostgreSQL-3
-      ansible.builtin.command: 'yum install -y postgresql-server'
-
-    - name: Reglage PostgreSQL
-      ansible.builtin.command: "adduser -p '' postgres"
-
-    - name: Reglage PostgreSQL-1
-      ansible.builtin.command: "mkdir -p /usr/local/pgsql"
-
-    - name: Reglage PostgreSQL-2
-      ansible.builtin.command: "chown -R postgres /usr/local/pgsql"
-
-    - name: Reglage PostgreSQL-3
-      ansible.builtin.command: "chown -R postgres /var/run/postgresql"
-
-    - name: Reglage PostgreSQL-4
-      become_user: postgres
-      ansible.builtin.command: "initdb -D /usr/local/pgsql/data"
-
-    - name: Reglage PostgreSQL-5
-      become_user: postgres
-      ansible.builtin.command: "pg_ctl -D /usr/local/pgsql/data -l /home/postgres/logfile start"
-      
-    - name: Reglage PostgreSQL-6
-      become_user: postgres
-      ansible.builtin.command: "createuser -w sonar"
-
-    - name: Reglage PostgreSQL-7
-      become_user: postgres
-      ansible.builtin.command: "psql -c 'CREATE DATABASE sonarqube OWNER sonar;'"
-      
-    - name: Reglage PostgreSQL-8
-      become_user: postgres
-      ansible.builtin.command: "psql -c 'grant all privileges on DATABASE sonarqube to sonar;'"
+    - name: Start Nexus service
+      ansible.builtin.service: 
+        name: nexus 
+        enabled: yes
+        state: started 
+        pattern: /opt/nexus
