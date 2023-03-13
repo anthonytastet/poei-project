@@ -109,10 +109,23 @@
         name: jenkins
         state: latest
 
-    - name: Install Maven packages
-      ansible.builtin.yum :
-        name: maven
-        state: latest
+    # - name: Install Maven packages
+    #   ansible.builtin.yum :
+    #     name: maven
+    #     state: latest
+
+    - name: Install Maven [ 1/2]
+      ansible.builtin.unarchive:
+        src: https://dlcdn.apache.org/maven/maven-3/3.9.0/binaries/apache-maven-3.9.0-bin.tar.gz
+        dest: /opt
+        remote_src: yes
+      args:
+        creates: /opt/maven
+
+    - name: Install Maven [ 2/2]
+      ansible.builtin.shell: mv -f /opt/apache-maven-* /opt/maven
+      args:
+        creates: /opt/maven
 
     - name: Install Nexus [ 1/3]
       ansible.builtin.unarchive:
@@ -182,29 +195,59 @@
         state: touch
         mode: +x
 
+    # - name: Post installation setup - set MAVEN_HOME
+    #   ansible.builtin.lineinfile: 
+    #     dest: /etc/profile.d/maven.sh
+    #     insertafter: EOF
+    #     line: "export MAVEN_HOME=/usr/share/maven/"
+
+    # - name: Post installation setup - set M2_HOME
+    #   ansible.builtin.lineinfile: 
+    #     dest: /etc/profile.d/maven.sh
+    #     insertafter: EOF
+    #     line: "export M2_HOME=/usr/share/maven/"
+
+    # - name: Post installation setup - set JAVA_HOME for Maven
+    #   ansible.builtin.lineinfile: 
+    #     dest: /etc/profile.d/maven.sh
+    #     insertafter: EOF
+    #     line: "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-17.0.1.0.12-2.el8_5.x86_64" 
+
+    # - name: Post installation setup - set PATH for Maven
+    #   ansible.builtin.lineinfile: 
+    #     dest: /etc/profile.d/maven.sh
+    #     insertafter: EOF
+    #     line: "export PATH=${M2_HOME}/bin:${PATH}" 
+
+    # - name: Post installation setup - make maven.sh executable
+    #   ansible.builtin.file:
+    #     path: /etc/profile.d/maven.sh
+    #     state: touch
+    #     mode: +x
+
     - name: Post installation setup - set MAVEN_HOME
       ansible.builtin.lineinfile: 
         dest: /etc/profile.d/maven.sh
         insertafter: EOF
-        line: "export MAVEN_HOME=/usr/share/maven/"
+        line: "export MAVEN_HOME=/opt/maven/"
 
     - name: Post installation setup - set M2_HOME
       ansible.builtin.lineinfile: 
         dest: /etc/profile.d/maven.sh
         insertafter: EOF
-        line: "export M2_HOME=/usr/share/maven/"
+        line: "export M2_HOME=/opt/maven/"
 
     - name: Post installation setup - set JAVA_HOME for Maven
       ansible.builtin.lineinfile: 
         dest: /etc/profile.d/maven.sh
         insertafter: EOF
-        line: "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-17.0.1.0.12-2.el8_5.x86_64" 
+        line: "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-17.0.1.0.12-2.el8_5.x86_64"
 
     - name: Post installation setup - set PATH for Maven
       ansible.builtin.lineinfile: 
         dest: /etc/profile.d/maven.sh
         insertafter: EOF
-        line: "export PATH=${M2_HOME}/bin:${PATH}" 
+        line: "export PATH=${M2_HOME}/bin:${PATH}"
 
     - name: Post installation setup - make maven.sh executable
       ansible.builtin.file:
@@ -229,7 +272,7 @@
     - name: Post installation setup - set Nexus listen port
       ansible.builtin.lineinfile: 
         dest: /opt/sonatype-work/nexus3/etc/nexus.properties 
-        regexp: "^application-port=" 
+        regexp: "^# application-port=8081" 
         line: "application-port=18081" 
         backrefs: true
 
