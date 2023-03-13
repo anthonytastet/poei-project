@@ -65,5 +65,12 @@ pipeline {
                 }
             }
         }
+        stage("Push artifact to vm02") {
+            steps {
+                script {
+                    sh "mvn package -DskipTests=true"
+                }
+            }
+        }
     }
 }
