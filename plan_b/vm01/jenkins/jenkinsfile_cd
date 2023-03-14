@@ -19,7 +19,7 @@ pipeline {
             }
         }
         */
-        stage("Push artifact to vm02") {
+        stage("Push artifact to VM02") {
             steps {
                 script {
                     sh script : 'ssh trainee@10.0.2.46 \'curl -u admin:admin -o /tmp/bookstore-1.war "http://10.0.2.45:18081/repository/bookstore-releases/com/mycompany/myapp/bookstore/1/bookstore-1.war"\''
